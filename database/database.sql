@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 24, 2022 at 07:31 PM
+-- Generation Time: May 26, 2022 at 06:42 PM
 -- Server version: 10.4.21-MariaDB
 -- PHP Version: 7.3.31
 
@@ -25,10 +25,71 @@ DELIMITER $$
 --
 -- Procedures
 --
+DROP PROCEDURE IF EXISTS `GetStudentAttendance`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GetStudentAttendance` (`iBatchStudentID` INT, `iFromDate` DATE, `iToDate` DATE)  BEGIN
+Declare iBatchID int;
+drop table if exists AttendanceTakenDays;
+drop table if exists Absent;
+drop table if exists Present;
+drop table if exists Weekends;
+drop table if exists ListDates;
+drop table if exists RealAttendance;
+drop table if exists NA;
+
+set iBatchID = (select BatchID from BatchStudent where BatchStudentID = iBatchStudentID);
+
+Create temporary table Absent
+Select Date from Attendance where BatchStudentID =  iBatchStudentID and (Date between iFromDate and iToDate );
+
+Create temporary table AttendanceTakenDays
+select Date from AttendanceTaken
+where (Date between iFromDate and iToDate) and BatchID=iBatchID;
+
+call sp_GetHolidays (iFromDate, iToDate);
+ 
+Create temporary table Present
+select Date  from AttendanceTakenDays where Date not in (select Date from Absent);
+
+Create temporary table ListDates (AllDates date);
+While iFromDate<=iToDate
+do
+
+    Insert into ListDates select iFromDate as AllDates;
+    set iFromDate= DATE_ADD(iFromDate, interval 1 day);
+    End While;
+
+Create temporary table NA
+Select *, 'NA' as Attendance  from ListDates
+where AllDates not in
+(select Date from Present
+union
+select Date from Absent
+union
+select Date from Weekends);
+
+
+Create temporary table RealAttendance (Date Date, Attendance varchar(2));
+Insert into RealAttendance
+select * from (Select *, 'P' Attendance from Present
+union
+select *, 'A' Attendance from Absent
+union
+select * from Weekends
+union
+select * from NA)A;
+
+
+select * from RealAttendance order by Date;
+
+END$$
+
 DROP PROCEDURE IF EXISTS `sp_GetBatchAttendance`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_GetBatchAttendance` (IN `iYear` VARCHAR(4), IN `iClass` VARCHAR(10), IN `iSection` VARCHAR(1), IN `iFromDate` DATE, IN `iToDate` DATE)  BEGIN
 declare iBatchID int;
-
+declare Dates Text default '';
+Declare NoOfDates int;
+Declare i int default 1;
+Declare uniqueDate Date;
 set iBatchID = (Select BatchID from Batch where Class = iClass and Year = iYear and Section = iSection);
 drop table if exists Absent;
     drop table if exists NA;
@@ -38,6 +99,8 @@ drop table if exists WeekendAttendance;
 drop table if exists ListDates;
 drop table if exists TotalAttendance;
 drop table if exists TotalAttendanceWithDetails;    
+drop table if exists FinalResult;
+drop table if exists DatesTable;
 
 if iBatchID is not null then
 Create Temporary Table  Absent
@@ -93,9 +156,29 @@ select * from NA
 )A
 order by A.Date;
 
-select T.*,BS.UserID,U.UserID,concat(BS.RollNo,'. ',U.FirstName,' ',U.LastName)  as Student from TotalAttendance T left join batchstudent BS on T.BatchStudentID =BS.BatchStudentID
+
+Create temporary table FinalResult
+select T.*,BS.UserID,concat(BS.RollNo,'. ',U.FirstName,' ',U.LastName)  as Student from TotalAttendance T left join batchstudent BS on T.BatchStudentID =BS.BatchStudentID
 left join Users U on U.UserID = BS.UserID order by Date, Student;
+
+Create temporary table DatesTable(Date Date, RowNo int);
+Insert into DatesTable
+select *, ROW_NUMBER() OVER(ORDER BY Date ASC) AS RowNo  from (Select distinct Date from FinalResult)A;
+set NoOfDates= (Select Count(*) from DatesTable);
+While (i<=NoOfDates)
+do
+set uniqueDate = (select Date from DatesTable where RowNo = i);
+set Dates = Concat(Dates, ', MAX(CASE WHEN Date = "',uniqueDate,'" THEN Attendance END) "',uniqueDate,'"');
+
+set i=i+1;
+end while;
+set @dsql =Concat('SELECT Student ',Dates,'FROM FinalResult GROUP BY Student ORDER BY Student ASC');
+
+PREPARE stmt FROM @dsql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 end if;
+
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_GetHolidays`$$
@@ -195,7 +278,9 @@ INSERT INTO `attendance` (`AttendanceID`, `BatchStudentID`, `Date`) VALUES
 (3, 1, '2022-04-05'),
 (4, 2, '2022-04-06'),
 (5, 3, '2022-04-06'),
-(6, 4, '2022-05-23');
+(6, 4, '2022-05-23'),
+(8, 7, '2022-05-25'),
+(9, 4, '0000-00-00');
 
 -- --------------------------------------------------------
 
@@ -220,7 +305,9 @@ INSERT INTO `attendancetaken` (`AttendanceTakenID`, `BatchID`, `Date`) VALUES
 (3, 8, '2022-04-06'),
 (4, 9, '2022-04-05'),
 (1002, 9, '2022-04-06'),
-(1003, 8, '2022-05-23');
+(1003, 8, '2022-05-23'),
+(1005, 8, '2022-05-25'),
+(1006, 8, '0000-00-00');
 
 -- --------------------------------------------------------
 
@@ -274,7 +361,8 @@ INSERT INTO `batchstudent` (`BatchStudentID`, `BatchID`, `UserID`, `RollNo`) VAL
 (2, 8, 5, 2),
 (3, 9, 8, 1),
 (4, 8, 9, 3),
-(6, 14, 19, 1);
+(6, 14, 19, 1),
+(7, 8, 20, 3);
 
 -- --------------------------------------------------------
 
@@ -387,7 +475,8 @@ INSERT INTO `users` (`UserID`, `FirstName`, `LastName`, `Address`, `Phone`, `Use
 INSERT INTO `users` (`UserID`, `FirstName`, `LastName`, `Address`, `Phone`, `UserType`, `Username`, `Password`, `Email`, `ProfPic`) VALUES
 (8, 'Amar', 'Kaji', 'ptn', '9800000', 1, NULL, NULL, NULL, NULL),
 (9, 'Test', NULL, NULL, NULL, 1, NULL, NULL, NULL, NULL),
-(19, 'sujan', 'dhakal', 'tinthana', 'tinthana', 1, 'szan', 'admin', 'suzandhakal2056@gmail.com', NULL);
+(19, 'sujan', 'dhakal', 'tinthana', 'tinthana', 1, 'szan', 'admin', 'suzandhakal2056@gmail.com', NULL),
+(20, 'Ram', 'dhakal', 'tinthana', 'tinthana', 1, 'ram', 'dhakal', 'ram@gmail.com', NULL);
 
 -- --------------------------------------------------------
 
@@ -501,13 +590,13 @@ ALTER TABLE `year`
 -- AUTO_INCREMENT for table `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `AttendanceID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `AttendanceID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `attendancetaken`
 --
 ALTER TABLE `attendancetaken`
-  MODIFY `AttendanceTakenID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1004;
+  MODIFY `AttendanceTakenID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1015;
 
 --
 -- AUTO_INCREMENT for table `batch`
@@ -519,7 +608,7 @@ ALTER TABLE `batch`
 -- AUTO_INCREMENT for table `batchstudent`
 --
 ALTER TABLE `batchstudent`
-  MODIFY `BatchStudentID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `BatchStudentID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `holiday`
@@ -531,7 +620,7 @@ ALTER TABLE `holiday`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `UserID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `UserID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- Constraints for dumped tables
