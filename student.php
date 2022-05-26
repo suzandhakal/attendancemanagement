@@ -6,6 +6,7 @@ include 'include/layout/nav.php';
 if(!isset($_SESSION['user-status'])){
 
     header('location:index.php');
+    exit;
 ?>
 
 
@@ -110,6 +111,13 @@ if (mysqli_num_rows($result) > 0) {
         ?>
 
         <tr>
+            <td>
+                <?php
+                // header("Content-type: image/jpg");
+                header("Content-type: image/jpg"); 
+                echo $rowstudent['ProfPic']; 
+                ?>
+            </td>
           <td><?php echo $rowstudent['FirstName']; ?></td>
           <td><?php echo $rowstudent['LastName']; ?></td>
           <td><?php echo $rowstudent['Address']; ?></td>

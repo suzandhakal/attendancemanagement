@@ -15,11 +15,14 @@ if (mysqli_num_rows($result) > 0) {
 
     if($row['UserType']==0)
     {
-        echo "admin";
         $_SESSION['user-status'] = "admin";
+        $_SESSION['name'] = $row['FirstName'];
+        $_SESSION['UserID'] = $row['UserID'];
     }else{
-        echo "user";
         $_SESSION['user-status'] = "user";
+        $_SESSION['name'] = $row['FirstName'];
+        $_SESSION['UserID'] = $row['UserID'];
+
     }
     header('location:../index.php');
 

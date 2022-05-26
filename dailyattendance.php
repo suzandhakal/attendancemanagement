@@ -14,11 +14,10 @@ if(!isset($_SESSION['user-status'])){
 else
 {
   if($_SESSION['user-status'] == "admin"){
-    echo "you are logged in as admin";
     ?>
 
 
-
+<h3 class="text-center">Batch Attendance</h3>
 
 <form action="" method="post">
 
@@ -65,11 +64,7 @@ else
 </form>
 
 <table class="table">
-    <tr>
-        <th>Date</th>
-        <th>Attendance</th>
-        <th>Student</th>
-    </tr>
+   
     <?php 
 if(isset($_POST['attendance_report']))
 {
@@ -83,20 +78,47 @@ if(isset($_POST['attendance_report']))
     $record = "CALL sp_GetBatchAttendance('$year','$class','$section','$from','$to')";
 
     $resultbatchattendance = mysqli_query($conn,$record);
+    $metaquery = $resultbatchattendance;
+    $metdata = array();
+$th = '';
+// $i = 0;
+echo '<tr>';
+while ($finfo = $metaquery->fetch_field()) {
+    array_push($metdata,$finfo->name);
+    echo '<th>'.$finfo->name.'</th>';
+    // print_r($finfo);
+}
+echo '</tr>';
+// print_r($metdata);
 
 while($rowbatchstudent = mysqli_fetch_assoc($resultbatchattendance)) {
-    // echo print_r($rowbatchstudent);
-    ?>
-        <tr>
-            <td><?php echo $rowbatchstudent['Date']; ?></td>
-            <td><?php echo $rowbatchstudent['Attendance']; ?></td>
-            <td><?php echo $rowbatchstudent['Student']; ?></td>
+    //   print_r($resultbatchattendance->fetch_field());
+        //  echo "hello";
+        // echo count($metdata);
+        $i=0;
+        // 
+        echo '<tr><td>'.$rowbatchstudent[$metdata[0]].'</td>';
+        foreach($metdata as $data)
+        {
+            if($i!=0){
+                echo '<td>'.$rowbatchstudent[$data].'</td>';
+                // print_r($data);
+                // echo "<br>";
+            }
+            $i++;
 
-        </tr>
-    <?php
+        }
+        echo '</tr>';
 
-}}
+        //  echo '<td>'.$rowbatchstudent[$finfo->name].'</td>';
+
+        // print_r($finfo);
+  
+}
+}
     ?>
+    
+   
 </table>
 <?php
 

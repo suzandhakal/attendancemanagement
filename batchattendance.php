@@ -1,4 +1,5 @@
-<?php include 'getattendance.php'; ?>
+<?php 
+include 'getattendance.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>

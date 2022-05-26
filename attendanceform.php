@@ -1,4 +1,6 @@
 
+
+<h3 class="text-center">Take Attendance</h3>
 <form action="" method="post">
 
 <div class="row">
@@ -26,8 +28,9 @@
 </div>
 
 <div class="col-4">
-
-</div>
+        <label class="form-label" for=""> Select Attendance Date</label>
+    <input class="form-control" type="date" name="attendance_date" id="">
+ </div>
 
 </div>
 <input type="submit" value="Continue" class="btn btn-primary" name="attendance_continue">
